@@ -1,0 +1,126 @@
+<html>
+
+<head>
+    <meta charset="UTF-8">
+    <title>Gomoku</title>
+
+    <style>
+        #gomokuboard {
+            display: block;
+            margin: 50px auto;
+            box-shadow: -2px -2px 2px #EFEFEF, 5px 5px 5px #B9B9B9;
+            background: rgb(202, 150, 65);
+        }
+    </style>
+</head>
+
+<body>
+    <canvas id="gomokuboard" width="450px" height="450px" />
+</body>
+
+</html>
+
+<script>
+    const gomokuboard = document.getElementById("gomokuboard");
+    const context = gomokuboard.getContext("2d");
+    const endpointBaseUrl = "http://localhost:3000/api";
+
+    let token;
+
+    window.onload = async () => {
+        // get token and store
+        const result = await signin();
+        token = result.token;
+
+        // setup backend
+        await startGame();
+
+        // setup frontend
+        initUI();
+    };
+
+    /**
+     * signin to get token
+    */
+    const signin = async () => {
+        const response = await fetch(`${endpointBaseUrl}/get_token`, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            }
+        });
+        const result = await response.json();
+        return result;
+    }
+
+    /**
+     * notify server to start a game
+    */
+    const startGame = async () => {
+        const response = await fetch(`${endpointBaseUrl}/start_game`, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${token}`
+            }
+        });
+    }
+
+    /**
+     * draw a gomokuboard and add click event callback
+    */
+    const initUI = () => {
+        context.strokeStyle = "black";
+        for (let i = 0; i < 15; i++) {
+            context.moveTo(15, 15 + i * 30);
+            context.lineTo(435, 15 + i * 30);
+            context.moveTo(15 + i * 30, 15);
+            context.lineTo(15 + i * 30, 435);
+            context.stroke();
+        }
+        gomokuboard.onclick = async (e) => {
+            const x = Math.floor(e.offsetX / 30);
+            const y = Math.floor(e.offsetY / 30);
+
+            const response = await fetch(`${endpointBaseUrl}/place`, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    Authorization: `Bearer ${token}`
+                },
+                body: JSON.stringify({ x, y })
+            });
+            const result = await response.json();
+            if (result.gameStatus === "game-over") {
+                alert(result.message);
+                location.reload();
+            } else if (result.gameStatus === "in-process") {
+                drawStone(x, y, "black");
+                drawStone(result.x, result.y, "white");
+            } else {
+                alert(result.message);
+            }
+        }
+    }
+
+    /**
+     * draw a stone in gomokuboard
+    */
+    const drawStone = async (i, j, player) => {
+        context.beginPath();
+        context.arc(15 + i * 30, 15 + j * 30, 13, 0, 2 * Math.PI);
+        const gradient = context.createRadialGradient(15 + i * 30 + 2, 15 + j * 30 - 2, 13, 15 + i * 30 + 2, 15 + j * 30 - 2, 0);
+        if (player === "black") {
+            gradient.addColorStop(0, "#0A0A0A");
+            gradient.addColorStop(1, "#636766");
+        }
+        else {
+            gradient.addColorStop(0, "#D1D1D1");
+            gradient.addColorStop(1, "#F9F9F9");
+        }
+        context.fillStyle = gradient;
+        context.fill();
+        context.closePath();
+    }
+
+</script>
